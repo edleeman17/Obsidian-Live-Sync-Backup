@@ -59,6 +59,7 @@ Alternatively, check your LiveSync plugin's `data.json` file:
 |----------|---------|-------------|
 | `RETENTION_DAYS` | `30` | Days to keep old backups |
 | `DRY_RUN` | `false` | Set to `true` to preview without making changes |
+| `UPTIME_KUMA_PUSH_URL` | - | Uptime Kuma push URL for monitoring |
 | `CA_CERT_HOST` | - | Path to CA certificate on host (for self-signed certs) |
 | `CA_CERT` | - | Path where cert is mounted in container (e.g., `/app/certs/ca.pem`) |
 | `CONFIG_PASSPHRASE` | - | For decrypting credentials from data.json (advanced) |
@@ -78,6 +79,22 @@ This will:
 - Show what old backups would be pruned
 
 No files are written or deleted in dry run mode.
+
+## Uptime Kuma Monitoring
+
+Optionally notify [Uptime Kuma](https://github.com/louislam/uptime-kuma) when backups complete or fail:
+
+1. In Uptime Kuma, add a new monitor with type "Push"
+2. Copy the Push URL
+3. Add to your `.env`:
+
+```bash
+UPTIME_KUMA_PUSH_URL=https://your-uptime-kuma/api/push/xxxxxxxx
+```
+
+The tool will:
+- Send `status=up` with "Backup completed" on success
+- Send `status=down` with error message on failure
 
 ## Scheduling Backups
 

@@ -17,6 +17,8 @@ services:
       - CA_CERT=${CA_CERT}
       # Optional: Dry run mode (set to "true" to preview without making changes)
       - DRY_RUN=${DRY_RUN:-false}
+      # Optional: Uptime Kuma push URL for monitoring
+      - UPTIME_KUMA_PUSH_URL=${UPTIME_KUMA_PUSH_URL}
     volumes:
       # Mount your data.json (read-only)
       - ./data.json:/app/config/data.json:ro

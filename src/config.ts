@@ -31,6 +31,7 @@ export interface BackupConfig {
   outputPath: string;
   retentionDays: number;
   dryRun: boolean;
+  uptimeKumaPushUrl?: string;
 }
 
 /**
@@ -65,6 +66,7 @@ export async function loadConfig(dataJsonPath?: string): Promise<BackupConfig> {
   const outputPath = Deno.env.get("NAS_PATH") || "/backup";
   const retentionDays = parseInt(Deno.env.get("RETENTION_DAYS") || "30", 10);
   const dryRun = Deno.env.get("DRY_RUN")?.toLowerCase() === "true";
+  const uptimeKumaPushUrl = Deno.env.get("UPTIME_KUMA_PUSH_URL") || undefined;
 
   // Check for direct CouchDB config (skips data.json decryption)
   const directUri = Deno.env.get("COUCHDB_URI");
@@ -126,5 +128,6 @@ export async function loadConfig(dataJsonPath?: string): Promise<BackupConfig> {
     outputPath,
     retentionDays,
     dryRun,
+    uptimeKumaPushUrl,
   };
 }

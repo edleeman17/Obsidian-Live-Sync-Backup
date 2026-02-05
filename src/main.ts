@@ -12,6 +12,7 @@ import { loadConfig } from "./config.ts";
 import { CouchDBClient } from "./couchdb.ts";
 import { Extractor } from "./extractor.ts";
 import { createZipArchive, pruneOldBackups } from "./backup.ts";
+import { notifyUptimeKuma } from "./notify.ts";
 import { ensureDir } from "https://deno.land/std@0.208.0/fs/mod.ts";
 
 /**
@@ -21,10 +22,12 @@ async function main() {
   console.log("=== LiveSync Backup ===");
   console.log(`Started at: ${new Date().toISOString()}`);
 
+  let config;
+
   try {
     // Load configuration
     const dataJsonPath = Deno.args[0]; // Optional: path to data.json as first argument
-    const config = await loadConfig(dataJsonPath);
+    config = await loadConfig(dataJsonPath);
 
     if (config.dryRun) {
       console.log("\n*** DRY RUN MODE - No files will be written or deleted ***\n");
@@ -84,6 +87,10 @@ async function main() {
         console.log("   (backup directory not accessible)");
       }
 
+      if (config.uptimeKumaPushUrl) {
+        console.log(`\n4. Notify Uptime Kuma at: ${config.uptimeKumaPushUrl}`);
+      }
+
       console.log("\n--- DRY RUN COMPLETE - No changes made ---");
       return;
     }
@@ -118,8 +125,19 @@ async function main() {
     }
 
     console.log(`\nBackup completed successfully at: ${new Date().toISOString()}`);
+
+    // Notify Uptime Kuma on success
+    if (config.uptimeKumaPushUrl) {
+      await notifyUptimeKuma(config.uptimeKumaPushUrl, "up", "Backup completed");
+    }
   } catch (error) {
     console.error(`\nBackup failed: ${error}`);
+
+    // Notify Uptime Kuma on failure
+    if (config?.uptimeKumaPushUrl) {
+      await notifyUptimeKuma(config.uptimeKumaPushUrl, "down", `Backup failed: ${error}`);
+    }
+
     Deno.exit(1);
   }
 }
