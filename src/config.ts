@@ -30,6 +30,7 @@ export interface BackupConfig {
   usePathObfuscation: boolean;
   outputPath: string;
   retentionDays: number;
+  dryRun: boolean;
 }
 
 /**
@@ -63,6 +64,7 @@ export async function loadConfig(dataJsonPath?: string): Promise<BackupConfig> {
     Deno.env.get("DB_SUFFIX") || "5987ba08b1ec3c27";
   const outputPath = Deno.env.get("NAS_PATH") || "/backup";
   const retentionDays = parseInt(Deno.env.get("RETENTION_DAYS") || "30", 10);
+  const dryRun = Deno.env.get("DRY_RUN")?.toLowerCase() === "true";
 
   // Check for direct CouchDB config (skips data.json decryption)
   const directUri = Deno.env.get("COUCHDB_URI");
@@ -123,5 +125,6 @@ export async function loadConfig(dataJsonPath?: string): Promise<BackupConfig> {
     usePathObfuscation,
     outputPath,
     retentionDays,
+    dryRun,
   };
 }

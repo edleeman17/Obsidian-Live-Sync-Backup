@@ -2,77 +2,17 @@
  * LiveSync Backup - Main entry point
  *
  * Extracts notes from CouchDB, decrypts them, and creates daily zip backups.
+ *
+ * SAFETY: This tool is designed to be read-only on the source (CouchDB) and
+ * only writes to designated backup locations. See the test suite for
+ * verification of safety properties.
  */
 
 import { loadConfig } from "./config.ts";
 import { CouchDBClient } from "./couchdb.ts";
 import { Extractor } from "./extractor.ts";
-import { join } from "https://deno.land/std@0.208.0/path/mod.ts";
-import { ensureDir, emptyDir } from "https://deno.land/std@0.208.0/fs/mod.ts";
-
-/**
- * Create a timestamped zip archive
- */
-async function createZipArchive(
-  sourceDir: string,
-  outputPath: string
-): Promise<void> {
-  const date = new Date().toISOString().split("T")[0];
-  const zipName = `obsidian-${date}.zip`;
-  const zipPath = join(outputPath, zipName);
-
-  console.log(`Creating backup: ${zipPath}`);
-
-  // Use zip command (available in most environments)
-  const process = new Deno.Command("zip", {
-    args: ["-r", zipPath, "."],
-    cwd: sourceDir,
-    stdout: "piped",
-    stderr: "piped",
-  });
-
-  const { code, stderr } = await process.output();
-
-  if (code !== 0) {
-    const errorText = new TextDecoder().decode(stderr);
-    throw new Error(`Failed to create zip: ${errorText}`);
-  }
-
-  // Get file size for logging
-  const stat = await Deno.stat(zipPath);
-  const sizeMB = (stat.size / 1024 / 1024).toFixed(2);
-  console.log(`Backup created: ${zipName} (${sizeMB} MB)`);
-}
-
-/**
- * Remove old backups beyond retention period
- */
-async function pruneOldBackups(
-  backupDir: string,
-  retentionDays: number
-): Promise<void> {
-  const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
-  let pruned = 0;
-
-  for await (const entry of Deno.readDir(backupDir)) {
-    if (!entry.isFile || !entry.name.startsWith("obsidian-") || !entry.name.endsWith(".zip")) {
-      continue;
-    }
-
-    const filePath = join(backupDir, entry.name);
-    const stat = await Deno.stat(filePath);
-
-    if (stat.mtime && stat.mtime.getTime() < cutoff) {
-      await Deno.remove(filePath);
-      console.log(`Pruned old backup: ${entry.name}`);
-      pruned++;
-    }
-  }
-
-  if (pruned > 0) {
-    console.log(`Pruned ${pruned} old backups`);
-  }
-}
+import { createZipArchive, pruneOldBackups } from "./backup.ts";
+import { ensureDir } from "https://deno.land/std@0.208.0/fs/mod.ts";
 
 /**
  * Main backup process
@@ -86,6 +26,10 @@ async function main() {
     const dataJsonPath = Deno.args[0]; // Optional: path to data.json as first argument
     const config = await loadConfig(dataJsonPath);
 
+    if (config.dryRun) {
+      console.log("\n*** DRY RUN MODE - No files will be written or deleted ***\n");
+    }
+
     // Create CouchDB client and test connection
     console.log("\nConnecting to CouchDB...");
     const client = new CouchDBClient(config.couchdb);
@@ -93,7 +37,58 @@ async function main() {
     console.log(`Connected to database: ${dbInfo.db_name}`);
     console.log(`Document count: ${dbInfo.doc_count}`);
 
-    // Create temp directory for extraction
+    // Fetch file entries to show what would be backed up
+    console.log("\nFetching file entries from CouchDB...");
+    const fileEntries = await client.getAllFileEntries();
+    console.log(`Found ${fileEntries.length} files to backup`);
+
+    if (config.dryRun) {
+      // In dry run mode, just show what would happen
+      console.log("\n--- DRY RUN: What would happen ---");
+      console.log(`\n1. Extract ${fileEntries.length} files to temp directory`);
+
+      // Show sample of files
+      const sample = fileEntries.slice(0, 10);
+      console.log("\n   Sample files:");
+      for (const entry of sample) {
+        console.log(`   - ${entry._id}`);
+      }
+      if (fileEntries.length > 10) {
+        console.log(`   ... and ${fileEntries.length - 10} more`);
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+      console.log(`\n2. Create backup: ${config.outputPath}/obsidian-${today}.zip`);
+
+      console.log(`\n3. Prune backups older than ${config.retentionDays} days in ${config.outputPath}`);
+
+      // Check what would be pruned
+      try {
+        const cutoff = Date.now() - config.retentionDays * 24 * 60 * 60 * 1000;
+        const backupPattern = /^obsidian-\d{4}-\d{2}-\d{2}\.zip$/;
+        let wouldPrune = 0;
+
+        for await (const entry of Deno.readDir(config.outputPath)) {
+          if (entry.isFile && backupPattern.test(entry.name)) {
+            const stat = await Deno.stat(`${config.outputPath}/${entry.name}`);
+            if (stat.mtime && stat.mtime.getTime() < cutoff) {
+              console.log(`   Would prune: ${entry.name}`);
+              wouldPrune++;
+            }
+          }
+        }
+        if (wouldPrune === 0) {
+          console.log("   (no old backups to prune)");
+        }
+      } catch {
+        console.log("   (backup directory not accessible)");
+      }
+
+      console.log("\n--- DRY RUN COMPLETE - No changes made ---");
+      return;
+    }
+
+    // Regular (non-dry-run) execution
     const tempDir = await Deno.makeTempDir({ prefix: "livesync-backup-" });
     console.log(`\nExtracting to: ${tempDir}`);
 

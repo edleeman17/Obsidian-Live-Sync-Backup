@@ -8,10 +8,14 @@
  * Chunks can be:
  * - Regular chunks: stored in separate "h:<hash>" documents
  * - Eden chunks: stored inline in the file entry's eden{} object
+ *
+ * SAFETY: All file writes go through writeFileSafely() which validates
+ * paths to prevent directory traversal and other path-based attacks.
  */
 
 import { CouchDBClient, FileEntry, LeafChunk } from "./couchdb.ts";
 import { decryptChunk } from "./crypto.ts";
+import { isPathSafe, sanitizePath } from "./path_safety.ts";
 import { join, dirname } from "https://deno.land/std@0.208.0/path/mod.ts";
 import { ensureDir } from "https://deno.land/std@0.208.0/fs/mod.ts";
 
@@ -20,6 +24,38 @@ export interface ExtractionResult {
   extractedFiles: number;
   failedFiles: string[];
   skippedFiles: string[];
+}
+
+/**
+ * Write a file safely within a base directory.
+ *
+ * SAFETY GUARANTEES:
+ * - Validates the path doesn't escape the base directory
+ * - Rejects path traversal attempts (../)
+ * - Rejects absolute paths
+ * - Rejects null byte injection
+ *
+ * Throws an error if the path is unsafe.
+ */
+export async function writeFileSafely(
+  baseDir: string,
+  relativePath: string,
+  content: string
+): Promise<void> {
+  // Validate the path is safe
+  if (!isPathSafe(relativePath, baseDir)) {
+    throw new Error(`Unsafe path rejected: ${relativePath}`);
+  }
+
+  // Sanitize and construct full path
+  const safePath = sanitizePath(relativePath);
+  const fullPath = join(baseDir, safePath);
+
+  // Ensure directory exists
+  await ensureDir(dirname(fullPath));
+
+  // Write file
+  await Deno.writeTextFile(fullPath, content);
 }
 
 export class Extractor {
@@ -113,6 +149,9 @@ export class Extractor {
 
   /**
    * Extract all files to a directory
+   *
+   * SAFETY: Each file path is validated before writing to prevent
+   * path traversal attacks from malicious CouchDB data.
    */
   async extractAll(outputDir: string): Promise<ExtractionResult> {
     const result: ExtractionResult = {
@@ -142,13 +181,9 @@ export class Extractor {
 
       try {
         const content = await this.reassembleFile(entry);
-        const fullPath = join(outputDir, filePath);
 
-        // Ensure directory exists
-        await ensureDir(dirname(fullPath));
-
-        // Write file
-        await Deno.writeTextFile(fullPath, content);
+        // SAFETY: Use writeFileSafely to validate path before writing
+        await writeFileSafely(outputDir, filePath, content);
         result.extractedFiles++;
 
         // Progress indicator

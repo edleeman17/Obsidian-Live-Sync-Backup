@@ -15,6 +15,8 @@ services:
       - COUCHDB_DATABASE=${COUCHDB_DATABASE}
       # Optional: CA certificate for self-signed certs
       - CA_CERT=${CA_CERT}
+      # Optional: Dry run mode (set to "true" to preview without making changes)
+      - DRY_RUN=${DRY_RUN:-false}
     volumes:
       # Mount your data.json (read-only)
       - ./data.json:/app/config/data.json:ro

@@ -58,9 +58,26 @@ Alternatively, check your LiveSync plugin's `data.json` file:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `RETENTION_DAYS` | `30` | Days to keep old backups |
+| `DRY_RUN` | `false` | Set to `true` to preview without making changes |
 | `CA_CERT_HOST` | - | Path to CA certificate on host (for self-signed certs) |
 | `CA_CERT` | - | Path where cert is mounted in container (e.g., `/app/certs/ca.pem`) |
 | `CONFIG_PASSPHRASE` | - | For decrypting credentials from data.json (advanced) |
+
+## Dry Run Mode
+
+Before running a real backup, you can preview what would happen:
+
+```bash
+DRY_RUN=true docker compose run --rm livesync-backup
+```
+
+This will:
+- Connect to CouchDB and verify credentials
+- List all files that would be backed up
+- Show what backup file would be created
+- Show what old backups would be pruned
+
+No files are written or deleted in dry run mode.
 
 ## Scheduling Backups
 
@@ -104,6 +121,42 @@ If no `CA_CERT` is configured, the tool automatically skips TLS verification. Th
 6. Moves archive to your backup destination
 7. Deletes backups older than retention period
 
+## Safety
+
+This tool is designed with safety as a top priority:
+
+### What it will NEVER do:
+- **Delete your notes** - Read-only access to CouchDB; no write or delete operations
+- **Write outside backup directory** - Path traversal attacks are blocked
+- **Delete non-backup files** - Only files matching `obsidian-YYYY-MM-DD.zip` can be pruned
+- **Delete directories** - Only regular files are considered for pruning
+
+### Safety features:
+- **Path validation** - All file paths are validated before writing
+- **Strict filename pattern** - Backup pruning uses exact regex matching
+- **Dry run mode** - Preview all operations before running
+- **Comprehensive test suite** - 35+ tests verify safety guarantees
+
+## Testing
+
+Run the test suite to verify safety guarantees:
+
+```bash
+# Run tests in Docker
+docker compose run --rm --user root --entrypoint deno livesync-backup test --allow-read --allow-write --allow-env src/tests/
+
+# Or locally with Deno
+deno test --allow-read --allow-write --allow-env src/tests/
+```
+
+Tests cover:
+- Path traversal prevention
+- Absolute path rejection
+- Null byte injection prevention
+- Backup filename pattern validation
+- Retention period enforcement
+- Subdirectory traversal prevention
+
 ## Project Structure
 
 ```
@@ -113,7 +166,10 @@ livesync-backup/
 │   ├── config.ts      # Configuration loading
 │   ├── crypto.ts      # AES-256-GCM decryption (V2 format)
 │   ├── couchdb.ts     # CouchDB client
-│   └── extractor.ts   # Chunk reassembly and file writing
+│   ├── extractor.ts   # Chunk reassembly and file writing
+│   ├── backup.ts      # Zip creation and pruning
+│   ├── path_safety.ts # Path validation utilities
+│   └── tests/         # Test suite
 ├── Dockerfile
 ├── docker-compose.yml
 ├── entrypoint.sh      # Handles CA cert vs insecure TLS
