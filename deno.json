@@ -1,0 +1,16 @@
+{
+  "name": "livesync-backup",
+  "version": "1.0.0",
+  "tasks": {
+    "start": "deno run --allow-net --allow-read --allow-write --allow-env src/main.ts",
+    "test": "deno test --allow-net --allow-read --allow-write --allow-env",
+    "check": "deno check src/main.ts"
+  },
+  "imports": {
+    "octagonal-wheels/": "npm:octagonal-wheels@0.2.5/",
+    "nano": "npm:nano@10.1.4"
+  },
+  "compilerOptions": {
+    "strict": true
+  }
+}

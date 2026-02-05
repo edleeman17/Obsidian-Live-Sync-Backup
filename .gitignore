@@ -1,0 +1,21 @@
+# Environment files with secrets
+.env
+*.env.local
+
+# LiveSync config file (contains encrypted credentials)
+data.json
+
+# Backup output and logs
+backups/
+backup.log
+
+# Deno
+.deno/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

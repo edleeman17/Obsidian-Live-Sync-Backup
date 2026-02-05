@@ -1,0 +1,25 @@
+services:
+  livesync-backup:
+    build: .
+    container_name: livesync-backup
+    environment:
+      - E2EE_PASSPHRASE=${E2EE_PASSPHRASE}
+      - CONFIG_PASSPHRASE=${CONFIG_PASSPHRASE}
+      - DB_SUFFIX=${DB_SUFFIX:-5987ba08b1ec3c27}
+      - RETENTION_DAYS=${RETENTION_DAYS:-30}
+      - DATA_JSON_PATH=/app/config/data.json
+      # Direct CouchDB connection (optional - skips data.json decryption)
+      - COUCHDB_URI=${COUCHDB_URI}
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - COUCHDB_DATABASE=${COUCHDB_DATABASE}
+      # Optional: CA certificate for self-signed certs
+      - CA_CERT=${CA_CERT}
+    volumes:
+      # Mount your data.json (read-only)
+      - ./data.json:/app/config/data.json:ro
+      # Mount backup destination
+      - ${NAS_PATH:-./backups}:/backup
+      # Optional: Mount CA certificate
+      - ${CA_CERT_HOST:-/dev/null}:${CA_CERT:-/dev/null}:ro
+    restart: "no"
