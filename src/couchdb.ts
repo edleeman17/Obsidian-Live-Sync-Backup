@@ -20,6 +20,7 @@ export interface FileEntry {
   type: "notes" | "newnote" | "plain";
   eden?: Record<string, { data: string }>;
   deleted?: boolean;
+  data?: string;  // Inline encrypted data (for non-chunked files)
 }
 
 export interface LeafChunk {
@@ -160,5 +161,23 @@ export class CouchDBClient {
       },
     });
     return response.json();
+  }
+
+  /**
+   * Get the PBKDF2 salt from the sync parameters document
+   */
+  async getPBKDF2Salt(): Promise<Uint8Array | null> {
+    try {
+      const doc = await this.fetch<{ pbkdf2salt?: string }>(
+        "/_local/obsidian_livesync_sync_parameters"
+      );
+      if (doc.pbkdf2salt) {
+        // Decode base64 salt
+        return Uint8Array.from(atob(doc.pbkdf2salt), (c) => c.charCodeAt(0));
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 }

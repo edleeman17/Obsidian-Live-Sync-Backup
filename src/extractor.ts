@@ -14,7 +14,7 @@
  */
 
 import { CouchDBClient, FileEntry, LeafChunk } from "./couchdb.ts";
-import { decryptChunk } from "./crypto.ts";
+import { decryptChunk, setPBKDF2Salt } from "./crypto.ts";
 import { isPathSafe, sanitizePath } from "./path_safety.ts";
 import { join, dirname } from "https://deno.land/std@0.208.0/path/mod.ts";
 import { ensureDir } from "https://deno.land/std@0.208.0/fs/mod.ts";
@@ -160,6 +160,16 @@ export class Extractor {
       failedFiles: [],
       skippedFiles: [],
     };
+
+    // Fetch and set the PBKDF2 salt from CouchDB
+    console.log("Fetching PBKDF2 salt from CouchDB...");
+    const pbkdf2Salt = await this.client.getPBKDF2Salt();
+    if (pbkdf2Salt) {
+      setPBKDF2Salt(pbkdf2Salt);
+      console.log("PBKDF2 salt loaded successfully");
+    } else {
+      console.warn("Warning: No PBKDF2 salt found - encrypted files may fail to decrypt");
+    }
 
     console.log("Fetching file entries from CouchDB...");
     const fileEntries = await this.client.getAllFileEntries();

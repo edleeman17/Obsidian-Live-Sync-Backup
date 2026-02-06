@@ -12,8 +12,8 @@ import {
 import { isV2Encrypted, decryptV2, decryptChunk } from "../crypto.ts";
 
 Deno.test("isV2Encrypted: detects V2 prefix", () => {
-  assertEquals(isV2Encrypted("%$someencrypteddata"), true);
-  assertEquals(isV2Encrypted("%$"), true);
+  assertEquals(isV2Encrypted("%someencrypteddata"), true);
+  assertEquals(isV2Encrypted("%"), true);
 });
 
 Deno.test("isV2Encrypted: rejects non-V2 data", () => {
@@ -33,7 +33,7 @@ Deno.test("decryptV2: rejects data without V2 prefix", async () => {
 
 Deno.test("decryptV2: rejects malformed base64", async () => {
   await assertRejects(
-    () => decryptV2("%$!!!notbase64!!!", "passphrase"),
+    () => decryptV2("%!!!notbase64!!!", "passphrase"),
     Error
   );
 });
@@ -42,7 +42,7 @@ Deno.test("decryptV2: rejects data too short for header", async () => {
   // V2 needs at least: salt(16) + iv(12) + tag(16) = 44 bytes minimum
   // This base64 decodes to less than that
   await assertRejects(
-    () => decryptV2("%$dG9vc2hvcnQ=", "passphrase"),
+    () => decryptV2("%dG9vc2hvcnQ=", "passphrase"),
     Error
   );
 });
@@ -62,7 +62,7 @@ Deno.test("decryptChunk: attempts decryption for V2 data", async () => {
   // This will fail because it's not validly encrypted, but it should
   // attempt decryption (not pass through)
   await assertRejects(
-    () => decryptChunk("%$dG9vc2hvcnQ=", "passphrase"),
+    () => decryptChunk("%dG9vc2hvcnQ=", "passphrase"),
     Error
   );
 });

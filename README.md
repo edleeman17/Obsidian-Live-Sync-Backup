@@ -200,7 +200,7 @@ livesync-backup/
 
 LiveSync uses AES-256-GCM encryption with:
 - Key derivation: PBKDF2-SHA256 (310,000 iterations) + HKDF-SHA256
-- V2 format: `%$` prefix + base64(salt[16] + iv[12] + ciphertext + tag[16])
+- V2 format: `%` prefix + hex(iv[16]) + hex(salt[16]) + base64(ciphertext + tag[16])
 
 The tool handles both V2 encrypted chunks and plaintext (for files created before E2EE was enabled).
 
