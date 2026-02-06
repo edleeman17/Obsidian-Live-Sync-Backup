@@ -1,11 +1,11 @@
 /**
  * Document extraction - reassembles chunks and writes files.
  *
- * LiveSync stores files as:
- * 1. A file entry document with metadata and children[] array
- * 2. Multiple chunk documents containing the actual content
+ * LiveSync stores files in two ways:
+ * 1. Chunked files: file entry with children[] array pointing to chunk docs
+ * 2. Inline files: file entry with data field containing encrypted content
  *
- * Chunks can be:
+ * For chunked files, chunks can be:
  * - Regular chunks: stored in separate "h:<hash>" documents
  * - Eden chunks: stored inline in the file entry's eden{} object
  *
@@ -75,6 +75,9 @@ export class Extractor {
     // Collect all unique chunk IDs
     const allChunkIds = new Set<string>();
     for (const entry of fileEntries) {
+      // Skip inline files (they have data, not children)
+      if (!entry.children) continue;
+
       for (const chunkId of entry.children) {
         // Skip eden chunks (they're inline)
         if (!chunkId.startsWith("h:")) continue;
@@ -129,9 +132,20 @@ export class Extractor {
   }
 
   /**
-   * Reassemble and decrypt a file's content from its chunks
+   * Reassemble and decrypt a file's content from its chunks or inline data
    */
   private async reassembleFile(entry: FileEntry): Promise<string> {
+    // Handle inline files (data stored directly on entry, not in chunks)
+    if (entry.data) {
+      return await decryptChunk(entry.data, this.passphrase);
+    }
+
+    // Handle chunked files
+    if (!entry.children || entry.children.length === 0) {
+      // Empty file
+      return "";
+    }
+
     const decryptedChunks: string[] = [];
 
     for (const chunkId of entry.children) {

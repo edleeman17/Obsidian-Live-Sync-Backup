@@ -20,14 +20,22 @@ Deno.test("isV2Encrypted: rejects non-V2 data", () => {
   assertEquals(isV2Encrypted("plaintext"), false);
   assertEquals(isV2Encrypted(""), false);
   assertEquals(isV2Encrypted("$%wrongprefix"), false);
-  assertEquals(isV2Encrypted("% $spaceinprefix"), false);
+  // Note: "% data" is detected as encrypted (starts with %) even though
+  // decryption would fail. This is fine - we attempt decryption and it fails.
+});
+
+Deno.test("isV2Encrypted: detects both HKDF and inline formats", () => {
+  // HKDF format (%= prefix)
+  assertEquals(isV2Encrypted("%=somedata"), true);
+  // Inline format (% prefix)
+  assertEquals(isV2Encrypted("%somedata"), true);
 });
 
 Deno.test("decryptV2: rejects data without V2 prefix", async () => {
   await assertRejects(
     () => decryptV2("plaintext", "passphrase"),
     Error,
-    "Not V2 encrypted data"
+    "Not encrypted data"
   );
 });
 

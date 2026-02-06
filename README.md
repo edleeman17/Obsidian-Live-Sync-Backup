@@ -198,11 +198,18 @@ livesync-backup/
 
 ### Encryption
 
-LiveSync uses AES-256-GCM encryption with:
-- Key derivation: PBKDF2-SHA256 (310,000 iterations) + HKDF-SHA256
-- V2 format: `%` prefix + hex(iv[16]) + hex(salt[16]) + base64(ciphertext + tag[16])
+LiveSync uses AES-256-GCM encryption with multiple formats:
 
-The tool handles both V2 encrypted chunks and plaintext (for files created before E2EE was enabled).
+**HKDF format (`%=` prefix)** - used for chunked files:
+- Binary structure: `iv[12] + hkdfSalt[32] + ciphertext + tag`
+- Key derivation: PBKDF2(passphrase, globalSalt, 310000) → HKDF expansion
+- All base64 encoded after prefix
+
+**V2 legacy format (`%` prefix)** - used for some inline files:
+- Format: `%` + hex(iv[16]) + hex(salt[16]) + base64(ciphertext + tag)
+- Key derivation: PBKDF2(SHA256(passphrase), salt, 100000)
+
+The tool handles both formats and plaintext (for files created before E2EE was enabled).
 
 ### CouchDB Document Structure
 
@@ -222,6 +229,14 @@ deno run --unsafely-ignore-certificate-errors ...
 
 ### Many files fail with "Not V2 encrypted data"
 These are files created before you enabled E2EE, or files that weren't encrypted. Update to the latest version which handles plaintext chunks.
+
+### Some inline files fail with "Decryption failed"
+Files stored with inline data (not chunked) may use different encryption parameters. This can happen with:
+- Files imported from other apps (e.g., Bear)
+- Files created during a migration
+- Files encrypted with different settings
+
+**Workaround**: In Obsidian, make a small edit to the affected file and save it. This will re-encrypt it with the current settings and store it as a chunked file, which can be backed up.
 
 ### "Database not found"
 Check your `COUCHDB_DATABASE` value matches the actual database name in Fauxton.
